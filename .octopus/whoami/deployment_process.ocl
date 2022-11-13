@@ -1,0 +1,116 @@
+step "Add Namespace to Rancher RKE2 cluster" {
+
+    action {
+        properties = {
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Template.Id = "ActionTemplates-1"
+            Octopus.Action.Template.Version = "14"
+        }
+    }
+}
+
+step "Deploy Whoami deployment and service" {
+    properties = {
+        Octopus.Action.TargetRoles = "k8s_cluster"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesDeployRawYaml"
+        properties = {
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: whoami
+                  namespace: #{namespace}
+                  labels:
+                    app: whoami
+                spec:
+                  replicas: #{replicas}
+                  selector:
+                    matchLabels:
+                      app: whoami
+                  template:
+                    metadata:
+                      labels:
+                        app: whoami
+                    spec:
+                      containers:
+                      - name: whoami
+                        image: traefik/whoami:#{version}
+                        ports:
+                        - containerPort: 80
+                          protocol: TCP
+                ---
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  name: whoami
+                  namespace: #{namespace}
+                  labels:
+                    app: whoami
+                spec:
+                  selector:
+                    app: whoami
+                  ports:
+                    - port: 80
+                      protocol: TCP
+                      targetPort: #{target_port}
+            EOT
+            Octopus.Action.KubernetesContainers.Namespace = "#{namespace}"
+            Octopus.Action.Script.ScriptSource = "Inline"
+        }
+    }
+}
+
+step "Deploy Whoami ingress - Traefik" {
+    properties = {
+        Octopus.Action.TargetRoles = "k8s_cluster"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesDeployRawYaml"
+        environments = ["k3os_cluster"]
+        properties = {
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: v1
+                kind: Secret
+                metadata:
+                  name: lucasnet-tls
+                  namespace: #{namespace}
+                data:
+                  tls.crt: >-
+                    LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZrakNDQkhxZ0F3SUJBZ0lUZEFBQUFBWlNsZUtSSDhTd1pBQUFBQUFBQmpBTkJna3Foa2lHOXcwQkFRc0YKQURCS01STXdFUVlLQ1pJbWlaUHlMR1FCR1JZRGFXNTBNUmd3RmdZS0NaSW1pWlB5TEdRQkdSWUliSFZqWVhOdQpaWFF4R1RBWEJnTlZCQU1URUd4MVkyRnpibVYwTFVSRExURXRRMEV3SGhjTk1qSXdOekE0TURNME9USXdXaGNOCk1qUXdOekEzTURNME9USXdXakJ2TVFzd0NRWURWUVFHRXdKVlV6RVNNQkFHQTFVRUNCTUpWMmx6WTI5dWMybHUKTVJBd0RnWURWUVFIRXdkTllXUnBjMjl1TVJFd0R3WURWUVFLRXdoTWRXTmhjMjVsZERFUU1BNEdBMVVFQ3hNSApTRzl0WlV4aFlqRVZNQk1HQTFVRUF4TU1iSFZqWVhOdVpYUXVhVzUwTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGCkFBT0NBUThBTUlJQkNnS0NBUUVBdENEZ2Y1V1FWekRRTm5oQzk4RUxWSG9QRnVZaUI5T1RPWEM5WjVKZ3FwK2gKU1NEOEhpUEtrcml3b2RQbUQweG5JOW94aEhQK01IYWRFZUg0bTBLK1Uvb3pad213SG51QWJ5SWQweCsyQ3Q2bgo3eHNhcTNVWWdPM1hXTGpvRGg5M1owRERoOUk0ZTNKeFRYRGVPdHgvK3hpQ1pSTlpFaDUyK1p3MTQyVFIxa0hLCndUblFzTGJDeUtRcGdyYXgraFU4aTBpelh5R3UxNytpUlB3TTdBTVdhRDRtbGVHbGkzK0lPbWpyQ0ZESk53dTYKS2ZGUlFMdjJhY1EwYUIwbEJYbGpyYi9qUXhBQzFwT2RKNHRPem8rbjdoSldXU2RiYWt2bzNONU94NUVFbWV5cgpVa2N3U0FYdmFpcWQ3Nm1vSVI1TXpraWxYM3VIUm1xYndSeGkrTVZYMVFJREFRQUJvNElDU2pDQ0FrWXdJUVlKCkt3WUJCQUdDTnhRQ0JCUWVFZ0JYQUdVQVlnQlRBR1VBY2dCMkFHVUFjakFUQmdOVkhTVUVEREFLQmdnckJnRUYKQlFjREFUQU9CZ05WSFE4QkFmOEVCQU1DQmFBd0hRWURWUjBPQkJZRUZMSmQxeGY3UG5lekpXbTBYTlpOT05ZRQpXaVZtTUNjR0ExVWRFUVFnTUI2Q0Rpb3ViSFZqWVhOdVpYUXVhVzUwZ2d4c2RXTmhjMjVsZEM1cGJuUXdId1lEClZSMGpCQmd3Rm9BVVpFOFEvTXdHbi9JcjBGd3lPTlhwNnArZG50c3dnY3dHQTFVZEh3U0J4RENCd1RDQnZxQ0IKdTZDQnVJYUJ0V3hrWVhBNkx5OHZRMDQ5YkhWallYTnVaWFF0UkVNdE1TMURRU3hEVGoxRVF5MHhMRU5PUFVORQpVQ3hEVGoxUWRXSnNhV01sTWpCTFpYa2xNakJUWlhKMmFXTmxjeXhEVGoxVFpYSjJhV05sY3l4RFRqMURiMjVtCmFXZDFjbUYwYVc5dUxFUkRQV3gxWTJGemJtVjBMRVJEUFdsdWREOWpaWEowYVdacFkyRjBaVkpsZG05allYUnAKYjI1TWFYTjBQMkpoYzJVL2IySnFaV04wUTJ4aGMzTTlZMUpNUkdsemRISnBZblYwYVc5dVVHOXBiblF3Z2NNRwpDQ3NHQVFVRkJ3RUJCSUcyTUlHek1JR3dCZ2dyQmdFRkJRY3dBb2FCbzJ4a1lYQTZMeTh2UTA0OWJIVmpZWE51ClpYUXRSRU10TVMxRFFTeERUajFCU1VFc1EwNDlVSFZpYkdsakpUSXdTMlY1SlRJd1UyVnlkbWxqWlhNc1EwNDkKVTJWeWRtbGpaWE1zUTA0OVEyOXVabWxuZFhKaGRHbHZiaXhFUXoxc2RXTmhjMjVsZEN4RVF6MXBiblEvWTBGRApaWEowYVdacFkyRjBaVDlpWVhObFAyOWlhbVZqZEVOc1lYTnpQV05sY25ScFptbGpZWFJwYjI1QmRYUm9iM0pwCmRIa3dEUVlKS29aSWh2Y05BUUVMQlFBRGdnRUJBSHBEd3NlNWJNeTJvS3JMeDhMNTRrbUhOcllWeXR1UnBoK0sKWHFGNmlCaGVPSksxSG9yVGFvVlc4anorbHhMRFBIWEgwdmlUbHRlc2t0Ulh0d1g5WHZvT2V6TWxRSGVBcTkxVgpReW5lZHZwZUV2Qkt3Tm55YVNHNm5waWxFUS9xMlBvdVh4c1NnVStoaHB4bm82bDU4bmtwTTh3eDVaQWZwYTZCCmRCZndON2tUMTV1a043RVdhWXVIdC9iQ3V2QUpPRTE5a0pHRGMxZXNFblpJV3IrVE1CSHFHWFQwMjAydFdBQSsKR0RZcVhXSmFvS1ZMTXhqQWpNd3RXNitUTURUdTRkWGp2TTlZdVk2U0VBMWtBSVdLSUtxUUZLZk1veFg0czdTYQpDSkdjM0lTMVVnYm9Rc1EvNVNWbmVOeFNpRWd1Wnp5MlAxTnh4RFJtQWZGTmM1N0xzaGc9Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+                  tls.key: >-
+                    LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFb3dJQkFBS0NBUUVBdENEZ2Y1V1FWekRRTm5oQzk4RUxWSG9QRnVZaUI5T1RPWEM5WjVKZ3FwK2hTU0Q4CkhpUEtrcml3b2RQbUQweG5JOW94aEhQK01IYWRFZUg0bTBLK1Uvb3pad213SG51QWJ5SWQweCsyQ3Q2bjd4c2EKcTNVWWdPM1hXTGpvRGg5M1owRERoOUk0ZTNKeFRYRGVPdHgvK3hpQ1pSTlpFaDUyK1p3MTQyVFIxa0hLd1RuUQpzTGJDeUtRcGdyYXgraFU4aTBpelh5R3UxNytpUlB3TTdBTVdhRDRtbGVHbGkzK0lPbWpyQ0ZESk53dTZLZkZSClFMdjJhY1EwYUIwbEJYbGpyYi9qUXhBQzFwT2RKNHRPem8rbjdoSldXU2RiYWt2bzNONU94NUVFbWV5clVrY3cKU0FYdmFpcWQ3Nm1vSVI1TXpraWxYM3VIUm1xYndSeGkrTVZYMVFJREFRQUJBb0lCQUU4dWVLRjlGTE5QVU9mdwoyN2RmVStTeHR6cGd0YXJ0RmJYVldsMVNHazVHMTdaMjJuMUJUSVpNeTlDSGZvVlJGN0hKODZSKy9Nay9DdkxXCmU5dDhib0FwNXppdktJMXR5dHFQaTc3SUhOVVFaWkFWUVJjSDVWcWZzdDljZ1IzY05UZmRYMWF3VVlYcW0rWG4KN0xqQlB6MFkzQkVrZlM0YTJFQUhyQ1NtcUJ0Zm1WUUdTQ1RpYVB4VnorVEh0UW9tMEZWYWdQSUFVWUZzUlVpdwowK2Y3VHQ5cjVReWhQcFdCVGFvc01FaFArdXVZcmFNNXpHUnZEbjFGSEhzZDhNVGkzQW00dnJSaXE0a2ZiNnJKCisrQWRFdlBLWE9ucWxSVWlPVlJYbjNQR2FxcXZ5MVVwUnF1WU5EbVFFeEJqQkt1b2hpUmFjZlFtSUVGZGs2WTMKVTlWM1RNMENnWUVBeU9xQlAxMUwza0gxYVduQWdGVkd1SXZHcm1WM3E5Sm5WT0kzeThrOWhwelpiVHhoTXRmeQpKdmppUGZHM3ZiQXpRSkx6dTZDMmJaV2lObEJQVlVCSStRUlJDZTk0MG9UemdWOHB3b2pLaDNTOEl4MFFpODJZCjJ1UHVla1pmbUQ5MTVWWlVJa29mRDVDaUUvZllaZWF6ajJQTUM3a1RYTFZmUUR5NHdTR0Y1M3NDZ1lFQTVZTmYKYVd6OG9veUtWVU51bGFZNjB2bnlWbFQrUS9IeTAxT1drTTB3QzViZXBXd2JUZTdRa3o2NEtLbTVEUHppSmwwRApnWXBZS3NpMWMyNmJ6M3FEZDRoY1h2Um9lYVBYQ1JOU0cxc1kzblhTNjFvOE92eExJdUtpRkJUTktvMEJDb1h0CmRUa1JFMzkyQ0ZESTBQN09vNnlLZGJXVmEyNUswbXlPalRvVDlPOENnWUFaOWRNRmNQU2duejBxaGJPTjRYYmwKMlltdWR3WGplYWhJVzRLQ0hscUl6ak41M2RkaFRtM0hnMWtZVCtkQjUwWjREWVRZdFlkYzJYekFMOWhRVjZJVwpLdXlkc0FlWWkvMDZ0aVViTWJtWmp3ZlFNYTAxb3pjZzhWcWJDZ1RJRTBzVWV2Y2NCeC9FVHhmaUpLQWRhcFhBCjdWQXNJNW5RM002VjZrS2xFY1BQaVFLQmdIdElSUUQ1UlA3L1pQTUZ4S25uMzZNaUZYVWdOSEJFejMyS1ljOG8KR0kyeEhhbFgxNWJXRi8xdjdEWVRiTTQ0TERZVk1tUHI3dzRVUDd0Z2g1czhJTkFkVkJqQlNqbEVzNll4VmFKUwpIWnFwU1lHWU45QXJZeVM2L2ZxeGJiOVVmR0d0ck82Umw4V1Vhczl1clYvdDd3dG1DLzNNYXhXSTZmSDcwOXF5CmZyUExBb0dCQUtxYUl5VEwwQlFrTGJsZ0xPUldUOUVqRVBGcmhmMzZEVWRJaXRVeGxXQ25LQ2cxVUt6dTcxWTMKWWFCb1VickwyVzRVUFJHNy9rZmF5bVE5RHNnZjRJd21iVmlXQ2w3d3puMWxKK1JNRVhzS1B4TlNRUkRvT3JYMApRQWEybGVtbGErSW1SN1hqcTZqMlNocXg4SU52RW9WRkdkYkd1Qk1iREZjRTEvb0YrMlZCCi0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0tCg==
+                type: kubernetes.io/tls
+                ---
+                kind: Ingress
+                apiVersion: networking.k8s.io/v1
+                metadata:
+                  name: whoami
+                  namespace: #{namespace}
+                  annotations:
+                    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+                spec:
+                  tls:
+                    - hosts:
+                        - '#{cluster_url}'
+                      secretName: lucasnet-tls
+                  rules:
+                    - http:
+                        paths:
+                          - path: /whoami
+                            pathType: Prefix
+                            backend:
+                              service:
+                                name: whoami
+                                port:
+                                  number: 80
+                
+            EOT
+            Octopus.Action.KubernetesContainers.Namespace = "#{namespace}"
+            Octopus.Action.Script.ScriptSource = "Inline"
+        }
+    }
+}
