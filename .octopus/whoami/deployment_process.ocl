@@ -1,4 +1,5 @@
-step "Add Namespace to Rancher RKE2 cluster" {
+step "add-namespace-to-rancher-rke2-cluster" {
+    name = "Add Namespace to Rancher RKE2 cluster"
 
     action {
         properties = {
@@ -9,7 +10,8 @@ step "Add Namespace to Rancher RKE2 cluster" {
     }
 }
 
-step "Deploy Whoami deployment and service" {
+step "deploy-whoami-deployment-and-service" {
+    name = "Deploy Whoami deployment and service"
     properties = {
         Octopus.Action.TargetRoles = "k8s_cluster"
     }
@@ -17,6 +19,8 @@ step "Deploy Whoami deployment and service" {
     action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
+            Octopus.Action.Kubernetes.ServerSideApply.Enabled = "False"
+            Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "False"
             Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
                 apiVersion: apps/v1
                 kind: Deployment
@@ -56,22 +60,25 @@ step "Deploy Whoami deployment and service" {
                     - port: 80
                       protocol: TCP
                       targetPort: #{target_port}
-            EOT
+                EOT
             Octopus.Action.KubernetesContainers.Namespace = "#{namespace}"
             Octopus.Action.Script.ScriptSource = "Inline"
         }
     }
 }
 
-step "Deploy Whoami ingress - Traefik" {
+step "deploy-whoami-ingress-traefik" {
+    name = "Deploy Whoami ingress - Traefik"
     properties = {
         Octopus.Action.TargetRoles = "k8s_cluster"
     }
 
     action {
         action_type = "Octopus.KubernetesDeployRawYaml"
-        environments = ["k3os_cluster"]
+        environments = ["k3os-cluster"]
         properties = {
+            Octopus.Action.Kubernetes.ServerSideApply.Enabled = "False"
+            Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "False"
             Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
                 apiVersion: v1
                 kind: Secret
@@ -108,7 +115,7 @@ step "Deploy Whoami ingress - Traefik" {
                                 port:
                                   number: 80
                 
-            EOT
+                EOT
             Octopus.Action.KubernetesContainers.Namespace = "#{namespace}"
             Octopus.Action.Script.ScriptSource = "Inline"
         }
