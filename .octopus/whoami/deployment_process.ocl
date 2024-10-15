@@ -1,15 +1,3 @@
-step "add-namespace-to-rancher-rke2-cluster" {
-    name = "Add Namespace to Rancher RKE2 cluster"
-
-    action {
-        properties = {
-            Octopus.Action.RunOnServer = "true"
-            Octopus.Action.Template.Id = "ActionTemplates-1"
-            Octopus.Action.Template.Version = "14"
-        }
-    }
-}
-
 step "deploy-whoami-deployment-and-service" {
     name = "Deploy Whoami deployment and service"
     properties = {
