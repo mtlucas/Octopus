@@ -63,7 +63,7 @@ step "deploy-whoami-ingress-traefik" {
 
     action {
         action_type = "Octopus.KubernetesDeployRawYaml"
-        environments = ["k3os-cluster"]
+        environments = ["Production"]
         properties = {
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "False"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "False"
